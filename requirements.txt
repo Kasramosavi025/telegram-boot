@@ -1,0 +1,11 @@
+۲۰۲۵/۴/۲۵   ۰۹:۴۹
+
+flask
+pyTelegramBotAPI
+opencv-python-headless
+nump
+
+flask
+pyTelegramBotAPI
+opencv-python-headless
+numpy

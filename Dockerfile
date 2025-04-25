@@ -1,10 +1,3 @@
-۲۰۲۵/۴/۲۵   ۰۹:۵۰
-
-FROM python:3.9-slim
-WORKDIR /app
-COPY . .
-RUN pip
-
 FROM python:3.9-slim
 WORKDIR /app
 COPY . .

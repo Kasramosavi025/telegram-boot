@@ -2,5 +2,6 @@ python-telegram-bot==13.15
 flask==2.0.1
 werkzeug==2.0.3
 opencv-python==4.5.5.64
-deepface==0.0.75
-numpy==1.22.0
+deepface==0.0.68
+numpy==1.21.6
+tensorflow==2.8.0

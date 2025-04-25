@@ -3,8 +3,8 @@ from telegram import Update
 import os
 from flask import Flask, request
 import cv2
-import face_recognition
 import numpy as np
+from deepface import DeepFace
 
 # Create Flask app
 app = Flask(__name__)
@@ -19,64 +19,59 @@ dispatcher = updater.dispatcher
 # States for ConversationHandler
 CHOOSE_TARGET_FACE, PROCESS_MEDIA = range(2)
 
-# Global variable to store the target face (will be updated dynamically)
-target_face = None
-target_face_locations = None
+# Global variable to store the target face path
+target_face_path = None
 
 def start(update: Update, context: CallbackContext) -> int:
     update.message.reply_text("Hello! First, send me the face you want to use for swapping.")
     return CHOOSE_TARGET_FACE
 
 def set_target_face(update: Update, context: CallbackContext) -> int:
-    global target_face, target_face_locations
+    global target_face_path
     
     photo = update.message.photo[-1]
     file_id = photo.file_id
     file = context.bot.get_file(file_id)
     file.download('target_face.jpg')
     
-    # Load the target face image
-    target_face_image = face_recognition.load_image_file("target_face.jpg")
-    target_face_locations = face_recognition.face_locations(target_face_image)
-    
-    if len(target_face_locations) == 0:
+    # Verify the face
+    try:
+        DeepFace.verify("target_face.jpg", "target_face.jpg")  # Just to check if a face is detected
+    except:
         update.message.reply_text("No face detected in the image. Please send another photo with a clear face.")
         return CHOOSE_TARGET_FACE
     
-    # Extract the target face
-    target_rgb = face_recognition.load_image_file("target_face.jpg")
-    target_top, target_right, target_bottom, target_left = target_face_locations[0]
-    target_face = target_rgb[target_top:target_bottom, target_left:target_right]
-    
+    target_face_path = "target_face.jpg"
     update.message.reply_text("Target face set! Now send a photo or video to swap faces.")
     return PROCESS_MEDIA
 
-def swap_faces(source_image, target_face):
-    # Convert image to RGB (face_recognition uses RGB)
-    source_rgb = cv2.cvtColor(source_image, cv2.COLOR_BGR2RGB)
+def swap_faces(source_image, target_face_path):
+    # Use DeepFace to swap faces (DeepFace doesn't have a direct face swap, so we'll simulate it)
+    # For simplicity, we'll detect faces and overlay the target face (this is a basic implementation)
+    faces = DeepFace.extract_faces(source_image, detector_backend='opencv')
     
-    # Find all face locations in the source image
-    source_face_locations = face_recognition.face_locations(source_rgb)
-    
-    if len(source_face_locations) == 0:
+    if len(faces) == 0:
         return source_image  # No faces found, return original image
     
-    # Loop through all detected faces in the source image
-    for source_top, source_right, source_bottom, source_left in source_face_locations:
-        # Resize the target face to match the size of the source face
-        resized_target_face = cv2.resize(target_face, (source_right - source_left, source_bottom - source_top))
-        
-        # Place the target face onto the source image
-        source_rgb[source_top:source_bottom, source_left:source_right] = resized_target_face
+    # Load the target face
+    target_face_img = cv2.imread(target_face_path)
     
-    # Convert back to BGR for OpenCV
-    result_image = cv2.cvtColor(source_rgb, cv2.COLOR_RGB2BGR)
-    return result_image
+    for face in faces:
+        # Get the facial area
+        x, y, w, h = face['facial_area']['x'], face['facial_area']['y'], face['facial_area']['w'], face['facial_area']['h']
+        
+        # Resize target face to match the detected face size
+        resized_target_face = cv2.resize(target_face_img, (w, h))
+        
+        # Overlay the target face on the source image
+        source_image[y:y+h, x:x+w] = resized_target_face
+    
+    return source_image
 
 def handle_photo(update: Update, context: CallbackContext) -> int:
-    global target_face
+    global target_face_path
     
-    if target_face is None:
+    if target_face_path is None:
         update.message.reply_text("Please set a target face first by sending a photo of the face you want to use.")
         return CHOOSE_TARGET_FACE
     
@@ -90,7 +85,7 @@ def handle_photo(update: Update, context: CallbackContext) -> int:
     
     # Perform face swap for all faces
     update.message.reply_text("Photo received! Swapping all faces...")
-    result_image = swap_faces(image, target_face)
+    result_image = swap_faces(image, target_face_path)
     
     # Save the result
     cv2.imwrite('processed_photo.jpg', result_image)
@@ -100,9 +95,9 @@ def handle_photo(update: Update, context: CallbackContext) -> int:
     return PROCESS_MEDIA
 
 def handle_video(update: Update, context: CallbackContext) -> int:
-    global target_face
+    global target_face_path
     
-    if target_face is None:
+    if target_face_path is None:
         update.message.reply_text("Please set a target face first by sending a photo of the face you want to use.")
         return CHOOSE_TARGET_FACE
     
@@ -124,7 +119,7 @@ def handle_video(update: Update, context: CallbackContext) -> int:
             break
         
         # Swap all faces in the frame
-        processed_frame = swap_faces(frame, target_face)
+        processed_frame = swap_faces(frame, target_face_path)
         out.write(processed_frame)
     
     cap.release()
